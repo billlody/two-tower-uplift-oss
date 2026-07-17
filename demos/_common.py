@@ -9,8 +9,13 @@ import numpy as np
 import pandas as pd
 
 from tt_uplift import (
+    BaselineConfig,
+    CEVAE,
+    CEVAEConfig,
     DGPConfig,
+    DragonNet,
     SyntheticData,
+    TARNet,
     TwoTowerConfig,
     TwoTowerUpliftModel,
     fit_encoders,
@@ -64,6 +69,42 @@ def prep(df: pd.DataFrame, label_col: str = NORM_OUTCOME_COL):
     """Fit encoders on ``df`` and return ``(encoders, tensors)``."""
     enc = fit_encoders(df)
     return enc, transform(df, enc, label_col=label_col)
+
+
+def _baseline_cardinalities(enc):
+    """Concatenated device+content categorical cardinalities (single-input baselines)."""
+    return {**device_cardinalities(enc), **content_cardinalities(enc)}
+
+
+def _baseline_numeric_dim() -> int:
+    return len(DEVICE_NUMERIC) + len(CONTENT_NUMERIC)
+
+
+def build_tarnet(enc, seed: int = 0) -> TARNet:
+    """Construct a TARNet baseline sized to the encoders."""
+    import torch
+
+    torch.manual_seed(seed)
+    cfg = BaselineConfig(numeric_dim=_baseline_numeric_dim(), cat_cardinalities=_baseline_cardinalities(enc))
+    return TARNet(cfg)
+
+
+def build_dragonnet(enc, seed: int = 0) -> DragonNet:
+    """Construct a DragonNet baseline sized to the encoders."""
+    import torch
+
+    torch.manual_seed(seed)
+    cfg = BaselineConfig(numeric_dim=_baseline_numeric_dim(), cat_cardinalities=_baseline_cardinalities(enc))
+    return DragonNet(cfg)
+
+
+def build_cevae(enc, seed: int = 0) -> CEVAE:
+    """Construct a CEVAE baseline sized to the encoders."""
+    import torch
+
+    torch.manual_seed(seed)
+    cfg = CEVAEConfig(numeric_dim=_baseline_numeric_dim(), cat_cardinalities=_baseline_cardinalities(enc))
+    return CEVAE(cfg)
 
 
 def banner(title: str) -> None:

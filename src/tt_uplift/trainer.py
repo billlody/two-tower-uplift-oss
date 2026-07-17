@@ -18,6 +18,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
+from .cevae import CEVAE
 from .features import Tensors
 from .losses import pairwise_ranking_loss
 from .model import DragonNet, TARNet, TwoTowerUpliftModel
@@ -164,3 +165,58 @@ def predict_uplift_baseline(model: TARNet, data: Tensors) -> np.ndarray:
     cat = torch.cat([data.device_cat, data.content_cat], dim=1)
     out = model(numeric, cat, data.treatment_binary)
     return out["uplift"].cpu().numpy().ravel()
+
+
+def train_cevae(model: CEVAE, data: Tensors, cfg: TrainConfig, kl_weight: float = 1.0) -> CEVAE:
+    """Train CEVAE by maximizing the ELBO plus auxiliary-network losses.
+
+    Objective (all Gaussian likelihoods with unit variance reduce to MSE)::
+
+        L = recon_x + recon_y(factual) + BCE(t | z)
+            + kl_weight * KL(q(z|x,t,y) || N(0, I))
+            + aux_t + aux_y(factual)          # test-time inference nets
+
+    Returns the trained model (in-place, also returned for convenience).
+    """
+    set_seed(cfg.seed)
+    dev = torch.device(cfg.device)
+    model.to(dev).train()
+    opt = torch.optim.Adam(model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
+    rng = np.random.default_rng(cfg.seed)
+    n = data.outcome.shape[0]
+
+    numeric = torch.cat([data.device_numeric, data.content_numeric], dim=1)
+    cat = torch.cat([data.device_cat, data.content_cat], dim=1)
+
+    for _ in range(cfg.epochs):
+        for bidx in _iter_batches(n, cfg.batch_size, rng):
+            b = torch.as_tensor(bidx, dtype=torch.long)
+            t = data.treatment_binary[b].to(dev)
+            y = data.outcome[b].to(dev)
+            out = model(numeric[b].to(dev), cat[b].to(dev), t, y, sample=True)
+
+            recon_x = F.mse_loss(out["x_rec"], out["x"])
+            recon_y = F.mse_loss(out["y_rec"], y)
+            recon_t = F.binary_cross_entropy_with_logits(out["t_logit"], t)
+            kl = -0.5 * torch.mean(1 + out["z_logvar"] - out["z_mu"].pow(2) - out["z_logvar"].exp())
+
+            # Auxiliary inference networks: match observed t and factual y.
+            aux_t = F.binary_cross_entropy_with_logits(out["aux_t_logit"], t)
+            aux_y = F.mse_loss(t * out["aux_y1"] + (1 - t) * out["aux_y0"], y)
+
+            loss = recon_x + recon_y + recon_t + kl_weight * kl + aux_t + aux_y
+
+            opt.zero_grad()
+            loss.backward()
+            opt.step()
+
+    model.eval()
+    return model
+
+
+@torch.no_grad()
+def predict_uplift_cevae(model: CEVAE, data: Tensors) -> np.ndarray:
+    """Session-level uplift from CEVAE do-operator contrast (device+content features)."""
+    numeric = torch.cat([data.device_numeric, data.content_numeric], dim=1)
+    cat = torch.cat([data.device_cat, data.content_cat], dim=1)
+    return model.predict_uplift(numeric, cat).cpu().numpy().ravel()

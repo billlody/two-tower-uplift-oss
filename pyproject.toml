@@ -29,6 +29,7 @@ tt-demo-confounding = "demos.confounding_balance:main"
 tt-demo-device-fails = "demos.device_level_fails:main"
 tt-demo-distill = "demos.distillation_vs_aggregation:main"
 tt-demo-pareto = "demos.alpha_pareto:main"
+tt-demo-baselines = "demos.baseline_comparison:main"
 
 [build-system]
 requires = ["hatchling"]

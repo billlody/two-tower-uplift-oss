@@ -39,6 +39,7 @@ table/plot into `outputs/`.
 | Device-level fails | `python demos/device_level_fails.py` | §Offline Eval, "more ads = more engagement" paradox | **Yes.** Naive device-level regression recovers the **wrong (positive)** effect sign because per-device content sets differ; session decomposition fixes it. |
 | Distillation vs aggregation | `python demos/distillation_vs_aggregation.py` | Table `agg_vs_distill` | **Regime-dependent — reported honestly.** Both methods emit one score/device. On the clean default DGP, heuristic aggregation of a strong same-model teacher is competitive; the paper's 0.34→0.09 collapse depends on production handicaps (separate weaker teacher, hand-tuned recency weights over few sessions, temporal split) this minimal artifact does not simulate. See [`demos/README.md`](demos/README.md). |
 | α Pareto | `python demos/alpha_pareto.py` | Figure `pareto` | **Partially.** Sweeps α and plots the session-vs-device NQini frontier; the smooth trade-off is visible, the monotone trend is weak in the clean regime. |
+| Baseline comparison | `python demos/baseline_comparison.py` | §Offline Eval, response to "compare against deep uplift baselines" | **Yes (offline).** Trains TowerUplift, **TARNet**, **DragonNet**, and **CEVAE** on the same device-disjoint split and ranks them by held-out normalized Qini + correlation with the known effect. TowerUplift's session ranker leads the deep baselines on the synthetic world; reported without tuning the DGP to force it. |
 
 > **A note on integrity.** This artifact does **not** tune the synthetic DGP until
 > the method "wins." The paper's causal foundation — the balance/normalization
@@ -50,7 +51,7 @@ table/plot into `outputs/`.
 Run everything:
 
 ```bash
-for d in confounding_balance device_level_fails distillation_vs_aggregation alpha_pareto; do
+for d in confounding_balance device_level_fails distillation_vs_aggregation alpha_pareto baseline_comparison; do
   python demos/$d.py
 done
 ```
@@ -59,11 +60,11 @@ done
 
 **Kept (faithful core):** two-tower S-learner with Hadamard treatment
 interactions (`model.py`), device-uplift **distillation** head, optional
-**DoubleML** treatment residualization, **TARNet** + **DragonNet** NN baselines,
-pairwise **ranking loss** (`losses.py`), **AUCC / normalized Qini**
-(`evaluation.py`), stratified z-score normalization (`dgp.stratified_zscore`),
-heuristic aggregation baselines (`aggregation.py`), and balance diagnostics
-(`diagnostics.py`).
+**DoubleML** treatment residualization, **TARNet** + **DragonNet** + **CEVAE** NN
+uplift baselines (`model.py`, `cevae.py`), pairwise **ranking loss**
+(`losses.py`), **AUCC / normalized Qini** (`evaluation.py`), stratified z-score
+normalization (`dgp.stratified_zscore`), heuristic aggregation baselines
+(`aggregation.py`), and balance diagnostics (`diagnostics.py`).
 
 **Dropped (production-only, not needed for the arguments):** DCN-V2 cross layers,
 sequence transformers over watch/ad history, bucket & high-cardinality ID
@@ -77,13 +78,14 @@ src/tt_uplift/
 ├── dgp.py            # unified synthetic world + stratified normalization
 ├── features.py       # DataFrame -> tensors, encoders, treatment binarization
 ├── model.py          # TwoTowerUpliftModel (+ DoubleML), TARNet, DragonNet
+├── cevae.py          # CEVAE baseline (latent-confounder VAE, Louizos et al. 2017)
 ├── losses.py         # pairwise ranking loss
 ├── trainer.py        # single-machine training loop + prediction helpers
 ├── aggregation.py    # heuristic session->device aggregation baselines
 ├── evaluation.py     # AUCC / normalized Qini / uplift curve
 └── diagnostics.py    # balance report (corr, SMD, ATE contrast)
-demos/                # four scripts, one per paper argument
-tests/                # ground-truth sign checks + metric sanity
+demos/                # five scripts: four paper arguments + baseline comparison
+tests/                # ground-truth sign checks + metric sanity + baseline coverage
 docs/DGP.md           # the data-generating process and its known ground truth
 ```
 

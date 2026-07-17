@@ -6,6 +6,7 @@ Qini.  See ``demos/`` for the four paper arguments reproduced end-to-end.
 """
 
 from .aggregation import aggregate_to_device, broadcast_device_scores
+from .cevae import CEVAE, CEVAEConfig
 from .diagnostics import balance_report
 from .dgp import (
     DGPConfig,
@@ -27,7 +28,9 @@ from .trainer import (
     predict_device_uplift_two_tower,
     predict_session_uplift_two_tower,
     predict_uplift_baseline,
+    predict_uplift_cevae,
     train_baseline,
+    train_cevae,
     train_two_tower,
 )
 
@@ -45,12 +48,16 @@ __all__ = [
     "BaselineConfig",
     "TARNet",
     "DragonNet",
+    "CEVAE",
+    "CEVAEConfig",
     "TrainConfig",
     "train_two_tower",
     "train_baseline",
+    "train_cevae",
     "predict_session_uplift_two_tower",
     "predict_device_uplift_two_tower",
     "predict_uplift_baseline",
+    "predict_uplift_cevae",
     "compute_aucc",
     "normalized_qini",
     "uplift_curve",
