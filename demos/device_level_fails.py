@@ -32,9 +32,9 @@ def main() -> None:
     # (a) Naive device-level: aggregate treatment & raw outcome per device, regress.
     dev = df.groupby("device_id").agg(
         ad_load=(TREATMENT_COL, "mean"),
-        outcome=(RAW_OUTCOME_COL, "mean"),
+        view_time=(RAW_OUTCOME_COL, "mean"),
     )
-    slope_device_naive = _slope(dev["ad_load"].to_numpy(), dev["outcome"].to_numpy())
+    slope_device_naive = _slope(dev["ad_load"].to_numpy(), dev["view_time"].to_numpy())
 
     # (b) Device-level on raw sessions (pooled, no stratification).
     slope_session_raw = _slope(df[TREATMENT_COL].to_numpy(), df[RAW_OUTCOME_COL].to_numpy())

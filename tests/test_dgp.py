@@ -8,8 +8,8 @@ from tt_uplift.diagnostics import balance_report
 
 def _report(seed: int = 42):
     data = generate()
-    df = stratified_zscore(data.sessions, "watch_percent", out_col="norm_watch_percent")
-    return balance_report(df, "ad_load", "watch_percent", "norm_watch_percent", "duration")
+    df = stratified_zscore(data.sessions, "view_time", out_col="norm_view_time")
+    return balance_report(df, "ad_load", "view_time", "norm_view_time", "duration")
 
 
 def test_raw_correlation_is_spuriously_positive():

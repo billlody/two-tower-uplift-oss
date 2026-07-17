@@ -41,9 +41,9 @@ def test_normalized_qini_range_sane():
 
 def test_two_tower_recovers_device_ground_truth():
     data = generate(DGPConfig(n_devices=1500, seed=7))
-    df = stratified_zscore(data.sessions, "watch_percent", out_col="norm_watch_percent")
+    df = stratified_zscore(data.sessions, "view_time", out_col="norm_view_time")
     enc = fit_encoders(df)
-    tens = transform(df, enc, label_col="norm_watch_percent")
+    tens = transform(df, enc, label_col="norm_view_time")
     cfg = TwoTowerConfig(
         device_numeric_dim=len(DEVICE_NUMERIC),
         content_numeric_dim=len(CONTENT_NUMERIC),

@@ -17,21 +17,16 @@ The causal story (matches the paper's ad-load setting)
   mixing is what makes naive device-level causal estimation fail.
 * **Treatment** (ad load) is confounded on purpose: longer content carries more/denser
   ad breaks, ``ad_load = g(L_c) + noise``.
-* **Outcome** (engagement) has a KNOWN causal effect.  Latent engagement in
-  minutes is::
+* **Outcome** (engagement) has a KNOWN causal effect::
 
       view_time = beta * L_c            # confounder's large effect on raw minutes
                 + tau(theta_d) * ad_load # TRUE causal effect, tau < 0 (heterogeneous)
                 + noise
 
-  and the OBSERVED outcome is **watch percent** ``watch_percent = view_time /
-  content_minutes`` (engagement normalized by content length).  Dividing by
-  duration makes the confounder enter through the denominator as well, so it does
-  NOT cleanly factor out under content-stratified normalization the way it did for
-  raw ``view_time``.  The raw ``corr(ad_load, watch_percent)`` is still confounded;
-  stratified normalization *attenuates* the confounding but no longer produces a
-  clean sign flip — this is closer to the messier production regime (see
-  ``docs/DGP.md``).
+  Because ``beta * L_c`` dominates and correlates with ``ad_load``, the *raw*
+  correlation ``corr(ad_load, view_time)`` is spuriously **positive** — the
+  "more ads => more engagement" paradox.  Stratified normalization within
+  duration x genre x type removes ``beta * L_c`` and exposes the true negative effect.
 
 Ground truth returned for verification (not assertion)
 ------------------------------------------------------
@@ -59,7 +54,7 @@ DEVICE_CATEGORICAL: List[str] = ["device_type"]  # TV / mobile / web
 CONTENT_NUMERIC: List[str] = ["duration", "release_year"]
 CONTENT_CATEGORICAL: List[str] = ["genre", "content_type"]
 TREATMENT_COL: str = "ad_load"
-RAW_OUTCOME_COL: str = "watch_percent"
+RAW_OUTCOME_COL: str = "view_time"
 
 _DEVICE_TYPES = ["tv", "mobile", "web"]
 _GENRES = ["action", "comedy", "drama", "doc", "kids"]
@@ -247,28 +242,21 @@ def generate(config: DGPConfig | None = None) -> SyntheticData:
         + cfg.tau_content * sess_content_effect
     )
 
-    # Latent engagement in minutes = confounder term + causal term + noise.
+    # Raw outcome = confounder term + causal term + noise.
     noise = cfg.outcome_noise * rng.normal(0.0, 1.0, size=total)
-    view_time_minutes = (
+    view_time = (
         cfg.beta_duration * sess_dur_latent
         + tau_session * ad_load
         + noise
     )
 
-    # Observed outcome is WATCH PERCENT = engagement minutes / content minutes.
-    # Dividing by content duration changes the confounding structure: duration now
-    # enters the outcome through the denominator, not only through the
-    # ``beta_duration`` numerator term, so it no longer cleanly factors out under
-    # stratified normalization (see docs/DGP.md).
-    watch_percent = view_time_minutes / sess_minutes
-
     # Counterfactual outcomes under fixed high/low ad load (ground truth for
     # session/device uplift).  Use +1 / -1 std as high/low, matching the model's
-    # default t_high / t_low.  The contrast is scaled by 1 / content_minutes.
+    # default t_high / t_low.
     t_high, t_low = 1.0, -1.0
-    y_high = (cfg.beta_duration * sess_dur_latent + tau_session * t_high + noise) / sess_minutes
-    y_low = (cfg.beta_duration * sess_dur_latent + tau_session * t_low + noise) / sess_minutes
-    gt_session_uplift = y_high - y_low  # = tau_session * (t_high - t_low) / content_minutes
+    y_high = cfg.beta_duration * sess_dur_latent + tau_session * t_high + noise
+    y_low = cfg.beta_duration * sess_dur_latent + tau_session * t_low + noise
+    gt_session_uplift = y_high - y_low  # = tau_session * (t_high - t_low)
 
     # ---- Assemble sessions frame ------------------------------------------
     df = pd.DataFrame(
@@ -289,7 +277,7 @@ def generate(config: DGPConfig | None = None) -> SyntheticData:
             "content_type": np.array(_CONTENT_TYPES)[content_type[chosen_content]],
             # Treatment & outcome
             TREATMENT_COL: ad_load,
-            RAW_OUTCOME_COL: watch_percent,
+            RAW_OUTCOME_COL: view_time,
             # Ground truth (prefixed gt_)
             "gt_theta": sess_theta,
             "gt_tau_session": tau_session,
@@ -299,20 +287,17 @@ def generate(config: DGPConfig | None = None) -> SyntheticData:
         }
     )
 
-    # ---- Device-level ground-truth uplift: tau_d = E_c[uplift] per device --
-    # With a watch-percent outcome the per-session uplift is
-    # tau_session * (t_high - t_low) / content_minutes, so the 1/duration factor
-    # no longer marginalizes to a clean closed form (it depends on each device's
-    # realized content mix).  We therefore define the device-level target
-    # EMPIRICALLY as the mean session-level uplift over the device's own sessions
-    # -- still exactly what a device-only policy should recover, just estimated
-    # from the ground-truth counterfactuals rather than an analytic expression.
-    tau_d = pd.Series(gt_session_uplift).groupby(dev_ids).mean()
+    # ---- Device-level ground-truth uplift: tau_d = E_c[tau] per device -----
+    # The session-level content component (tau_content * eps_content) has mean ~0
+    # over the content distribution, so it marginalizes out: the device-level
+    # target is tau_d = (tau_base + tau_theta * theta_d) * (t_high - t_low).
+    # This is exactly what a device-only policy should recover.
+    tau_d = (cfg.tau_base + cfg.tau_theta * theta) * (t_high - t_low)
     device_truth = pd.DataFrame(
         {
             "device_id": np.arange(n_d),
             "theta": theta,
-            "tau_d_uplift": tau_d.reindex(np.arange(n_d)).to_numpy(),
+            "tau_d_uplift": tau_d,
         }
     )
 
