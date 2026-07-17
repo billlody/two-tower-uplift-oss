@@ -29,7 +29,7 @@ from tt_uplift.features import content_cardinalities, device_cardinalities
 OUTPUT_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "outputs")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-NORM_OUTCOME_COL = "norm_view_time"
+NORM_OUTCOME_COL = "norm_watch_percent"
 
 
 def make_data(config: DGPConfig | None = None) -> SyntheticData:

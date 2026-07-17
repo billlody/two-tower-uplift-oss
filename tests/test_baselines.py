@@ -32,9 +32,9 @@ from tt_uplift.features import content_cardinalities, device_cardinalities
 
 def _prepare(n_devices: int = 1500, seed: int = 7):
     data = generate(DGPConfig(n_devices=n_devices, seed=seed))
-    df = stratified_zscore(data.sessions, "view_time", out_col="norm_view_time")
+    df = stratified_zscore(data.sessions, "watch_percent", out_col="norm_watch_percent")
     enc = fit_encoders(df)
-    tens = transform(df, enc, label_col="norm_view_time")
+    tens = transform(df, enc, label_col="norm_watch_percent")
     cat_card = {**device_cardinalities(enc), **content_cardinalities(enc)}
     numeric_dim = len(DEVICE_NUMERIC) + len(CONTENT_NUMERIC)
     y = tens.outcome.numpy().ravel()
@@ -94,7 +94,7 @@ def test_all_models_rank_on_held_out_split():
     )
 
     data = generate(DGPConfig(n_devices=1500, seed=7))
-    df = stratified_zscore(data.sessions, "view_time", out_col="norm_view_time")
+    df = stratified_zscore(data.sessions, "watch_percent", out_col="norm_watch_percent")
     rng = np.random.default_rng(0)
     devices = df["device_id"].unique()
     test_devices = set(rng.choice(devices, size=int(len(devices) * 0.3), replace=False))
@@ -102,8 +102,8 @@ def test_all_models_rank_on_held_out_split():
     train_df, test_df = df[~is_test].copy(), df[is_test].copy()
 
     enc = fit_encoders(train_df)
-    train_t = transform(train_df, enc, label_col="norm_view_time")
-    test_t = transform(test_df, enc, label_col="norm_view_time")
+    train_t = transform(train_df, enc, label_col="norm_watch_percent")
+    test_t = transform(test_df, enc, label_col="norm_watch_percent")
     y = test_t.outcome.numpy().ravel()
     t = test_t.treatment_binary.numpy().ravel()
     cat_card = {**device_cardinalities(enc), **content_cardinalities(enc)}
