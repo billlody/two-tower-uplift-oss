@@ -75,3 +75,35 @@ Returned on the sessions frame (prefixed `gt_`) and in `device_truth`:
 > The synthetic world has no unmeasured confounders by construction; the paper
 > validates the deployed policy via an online A/B test precisely because real
 > logs do.
+
+## Synthetic vs production: the demo is deliberately cleaner
+
+This synthetic world is a **teaching instrument**, not a replica of production. In
+the DGP the *only* confounder is content duration, and it acts through a stratum-
+level channel that stratified normalization can fully absorb — so Demo 1 shows a
+clean sign **flip** (raw `corr +`, within-stratum `corr −`) and the confounder
+`|SMD|` drops below `0.1`.
+
+Production data does **not** behave this cleanly. On ~291M sessions
+(`train_2026-03-20`), stratified normalization *attenuates* but does not eliminate
+confounding:
+
+| Diagnostic | Raw / overall | Within-stratum | Change |
+|------------|---------------|----------------|--------|
+| `corr(ads_count_mean, tvt_sec)` | `+0.372` | `+0.177` | −53% |
+| `|SMD|` of `video_duration` | `0.557` | `0.165` | −70% |
+| ATE (high − low) | `+957.8 s` | `+0.128 sd` | ~3 orders |
+
+The within-stratum association stays **weakly positive** (it does not flip
+negative), and `|SMD|` stays above `0.1`. The likely reason is a channel the
+synthetic DGP omits: **within-session reverse causality** — longer watching
+mechanically triggers more midroll ad breaks (engagement → ad exposure), which no
+content-side stratum can remove. The paper reports this honestly and leans on the
+online A/B test to validate the *policy* rather than the offline point estimates.
+
+**Why keep the synthetic world clean?** To isolate one mechanism at a time for
+pedagogy. Set `DGPConfig(tau_content=..., outcome_noise=...)` higher, or add an
+endogenous ad-exposure term, to approach the messier production regime. The
+`stratified_normalization_diagnostics` Databricks notebook reproduces the
+production numbers above (including the H1 duration-resolution and H2
+preroll-vs-midroll tests for the residual's source).
