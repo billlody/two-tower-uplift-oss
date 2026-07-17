@@ -117,9 +117,20 @@ a per-content completion metric (`watch_percent`) — not mechanically inflated 
 longer watching — collapses it ~66%. The residual is therefore a **reverse-causality
 artifact of the view-time outcome** (longer watching mechanically triggers more
 midroll ad breaks: engagement → ad exposure), which no content- or device-side
-stratum can remove. The paper reports this honestly, leans on the online A/B test to
-validate the *policy* rather than the offline point estimates, and flags a
-completion-based label as a less-confounded alternative.
+stratum can remove. The paper reports this honestly and leans on the online A/B test
+to validate the *policy* rather than the offline point estimates.
+
+**Why not simply switch to the completion label?** Because a less-confounded label
+scores *lower* offline AUCC, and that is expected, not disqualifying. AUCC is computed
+against the observed (confounded) outcome, so it partially rewards fitting the
+confounding-driven treated−control gap; it is valid only for comparing models that
+share a label (confounding held fixed) and is **not comparable across labels** of
+differing confounding. A completion label's lower AUCC reflects *less confounding in
+the evaluation outcome*, not a worse causal target. The production label is retained
+because (i) label choice cannot be made from offline AUCC, and (ii) the view-time
+label aligns with the platform's view-time/revenue objectives, which the online
+experiment validates. The completion result is thus evidence that offline magnitudes
+are confounded — not a label recommendation.
 
 **Why keep the synthetic world clean?** To isolate one mechanism at a time for
 pedagogy: the synthetic DGP's only confounder is content duration, acting through a
