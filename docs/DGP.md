@@ -76,6 +76,26 @@ Returned on the sessions frame (prefixed `gt_`) and in `device_truth`:
 > validates the deployed policy via an online A/B test precisely because real
 > logs do.
 
+## Calibration to the production Qini ratio
+
+In production the **device-level** uplift Qini is about **half** the session-level
+Qini: a device-only policy recovers the between-device (device-actionable) share of
+the treatment effect but not the within-device, session-specific share (content,
+mood, context) that it never sees at serving time. The default `DGPConfig` is
+calibrated to reproduce this ~0.5 ratio, via two knobs:
+
+| Knob | Value | Role |
+|------|-------|------|
+| `tau_content` | `0.25` | Within-device (session-only) effect heterogeneity. Lower → more of the uplift variance is *between-device* and thus device-actionable (~2/3 at this setting). |
+| `feature_signal` / `feature_noise` | `2.0` / `0.3` | Device-feature SNR. Sets how well the distilled head can *read* latent tolerance `θ` from device features — the **binding** constraint: lowering `tau_content` alone leaves the ratio stuck near 0.3. |
+
+At these defaults the distillation demo reports session NQini `~0.22` and distilled
+device NQini `~0.10` (ratio `~0.46`, mean `0.46 ± 0.07` across seeds), and the
+distilled head's correlation with the device-level ground truth `τ_d` is `~0.83`.
+This is calibration to a *documented production observation*, not tuning the model
+or the metric to a desired outcome — the DGP knobs are interpretable and the demos
+still verify every ground-truth sign.
+
 ## Synthetic vs production: the demo is deliberately cleaner
 
 This synthetic world is a **teaching instrument**, not a replica of production. In

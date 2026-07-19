@@ -57,7 +57,12 @@ from _common import (
     transform,
 )
 
-EPOCHS = 15
+# Matches the distillation demo's budget (demos/distillation_vs_aggregation.py):
+# the distilled device head peaks around 10 epochs and overfits beyond it, so the
+# device/session Qini ratio (~0.5, the production regime) is reported at the same
+# budget across demos rather than at a longer schedule that inflates the session
+# head while degrading the device head.
+EPOCHS = 10
 SEED = 0
 
 

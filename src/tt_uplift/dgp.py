@@ -90,11 +90,23 @@ class DGPConfig:
     # pooling across all devices.
     tau_base: float = -0.60
     tau_theta: float = 0.35  # device heterogeneity: more tolerant -> less negative
-    tau_content: float = 0.55  # session-level effect heterogeneity (mean zero over content)
+    # Session-level (within-device) effect heterogeneity, mean zero over content.
+    # This is the component a DEVICE policy structurally CANNOT recover, so it caps
+    # the device/session Qini ratio.  Calibrated to 0.25 (down from 0.55) so that
+    # ~2/3 of the uplift variance is between-device (device-actionable), matching
+    # the production regime where the device-level Qini is ~half the session-level
+    # Qini.  See docs/DGP.md ("Calibration to the production Qini ratio").
+    tau_content: float = 0.25
 
     # How strongly latent tolerance shows up in (noisy) observed device features.
-    feature_signal: float = 0.8
-    feature_noise: float = 0.6
+    # feature_signal/feature_noise set the device-feature SNR: the device head can
+    # only recover the between-device effect as well as the features reveal theta.
+    # Calibrated to a high-SNR regime (2.0 / 0.3) so the distilled device head
+    # attains a device/session Qini ratio of ~0.5, as observed in production.
+    # (Lowering tau_content ALONE is insufficient -- device-feature SNR is the
+    # binding constraint on how much between-device signal the head can extract.)
+    feature_signal: float = 2.0
+    feature_noise: float = 0.3
 
     outcome_noise: float = 0.7
     duration_deciles: int = 10
