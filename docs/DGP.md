@@ -97,25 +97,35 @@ the *global*-mean label, the deconfounded view is the *within-stratum* label.
 > validates the deployed policy via an online A/B test precisely because real
 > logs do.
 
-## Calibration to the production Qini ratio
+## The device/session Qini ratio (why it is not a fixed "half")
 
-In production the **device-level** uplift Qini is about **half** the session-level
+In production the **device-level** uplift Qini is roughly **half** the session-level
 Qini: a device-only policy recovers the between-device (device-actionable) share of
 the treatment effect but not the within-device, session-specific share (content,
-mood, context) that it never sees at serving time. The default `DGPConfig` is
-calibrated to reproduce this ~0.5 ratio, via two knobs:
+mood, context) it never sees at serving time. The default `DGPConfig` tilts the
+world toward that regime with two interpretable knobs:
 
 | Knob | Value | Role |
 |------|-------|------|
 | `tau_content` | `0.25` | Within-device (session-only) effect heterogeneity. Lower → more of the uplift variance is *between-device* and thus device-actionable (~2/3 at this setting). |
-| `feature_signal` / `feature_noise` | `2.0` / `0.3` | Device-feature SNR. Sets how well the distilled head can *read* latent tolerance `θ` from device features — the **binding** constraint: lowering `tau_content` alone leaves the ratio stuck near 0.3. |
+| `feature_signal` / `feature_noise` | `2.0` / `0.3` | Device-feature SNR: how well the distilled head can *read* latent tolerance `θ` from device features. |
 
-At these defaults the distillation demo reports session NQini `~0.22` and distilled
-device NQini `~0.10` (ratio `~0.46`, mean `0.46 ± 0.07` across seeds), and the
-distilled head's correlation with the device-level ground truth `τ_d` is `~0.83`.
-This is calibration to a *documented production observation*, not tuning the model
-or the metric to a desired outcome — the DGP knobs are interpretable and the demos
-still verify every ground-truth sign.
+What the demo actually shows: the distilled head, from device features alone,
+**recovers the device-level ground truth `τ_d` well** (`corr(u_d, τ_d) ≈ 0.67` on the
+default). Its device-level *NQini*, however, is only a **fraction** of the
+session-level NQini — about `0.4` on the small demo default (4,000 devices) and
+`~0.2–0.3` at larger scale (20–40k devices, tight bootstrap CIs).
+
+We deliberately do **not** claim a fixed `0.5`. The ratio is regime- and
+sample-size-dependent: on the small default it looks close to a half, but that is
+partly small-sample noise (device NQini is a small, higher-variance number), and it
+settles lower at scale. Production's ~0.5 reflects its **575-feature device tower**
+and real data — far richer device signal than this artifact's five noisy features —
+which we do not try to reproduce. The honest takeaway is qualitative and robust: a
+device-constant score sacrifices the within-device ranking signal but still tracks
+the device-level effect, which is what makes the `O(1)` device policy viable. (See
+the `databricks/tt_uplift_benchmark.py` notebook for the large-scale, bootstrapped
+numbers.)
 
 ## Synthetic vs production: the demo is deliberately cleaner
 
