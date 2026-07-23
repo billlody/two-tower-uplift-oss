@@ -95,25 +95,25 @@ docs/DGP.md           # the data-generating process and its known ground truth
 
 [`databricks/tt_uplift_benchmark.py`](databricks/tt_uplift_benchmark.py) is a
 Databricks **source notebook** (importable via *Repos* or `databricks workspace
-import`) that runs the whole artifact at a scale the local demos are too small
-for. On an ML-runtime cluster, **Run All** executes seven cells:
+import`) that runs the model benchmark at a scale the local demos are too small
+for. On an ML-runtime cluster, **Run All** executes:
 
 1. **Install** the package (`pip install -e`) from the synced repo folder.
-2. **Test** — runs the full `pytest` suite and asserts it passes.
-3. **Large DGP** — generates **40,000 devices (~480k sessions)**, 10× the demo
+2. **Large DGP** — generates **40,000 devices (~480k sessions)**, 10× the demo
    default, with the binary within-stratum label.
-4. **Train** all five models on one device-disjoint split at equal budget:
+3. **Train** all five models on one device-disjoint split at equal budget:
    TowerUplift (session + deployed device head), TARNet, DragonNet, CEVAE.
-5. **Bootstrap NQini** — normalized Qini per model with **bootstrap 95%
+4. **Bootstrap NQini** — normalized Qini per model with **bootstrap 95%
    confidence intervals** (B=500 test-set resamples) plus correlation with the
    known per-session effect `gt_tau_session`.
-6. **Plot** the NQini comparison with CI error bars.
-7. **Notes** on the binary-label/BCE setup and how to read the intervals.
+5. **Plot** the NQini comparison with CI error bars.
+6. **Notes** on the binary-label/BCE setup and how to read the intervals.
 
-Why it exists: at the demo's default size (~14k test sessions) seed-to-seed
-NQini variance is comparable to the between-model gaps, so a single run cannot
-reliably rank models. The large DGP + bootstrap CIs make the ranking
-statistically meaningful. Import it into a workspace with:
+(The unit tests run locally via `pytest`, not in the notebook.) Why it exists:
+at the demo's default size (~14k test sessions) seed-to-seed NQini variance is
+comparable to the between-model gaps, so a single run cannot reliably rank
+models. The large DGP + bootstrap CIs make the ranking statistically
+meaningful. Import it into a workspace with:
 
 ```bash
 databricks workspace import /Users/<you>/tt_uplift_benchmark \

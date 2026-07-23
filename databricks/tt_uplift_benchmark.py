@@ -1,17 +1,20 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Two-Tower Uplift — Full Test + Model Qini Comparison
+# MAGIC # Two-Tower Uplift — Model Qini Comparison at Scale
 # MAGIC
-# MAGIC Runs the OSS artifact's test suite, then trains all five uplift models on a
-# MAGIC **large** synthetic DGP (10× the demo default) and compares their normalized
-# MAGIC Qini (NQini) with **bootstrap 95% confidence intervals**.
+# MAGIC Trains all five uplift models on a **large** synthetic DGP (10× the demo
+# MAGIC default) and compares their normalized Qini (NQini) with **bootstrap 95%
+# MAGIC confidence intervals**.
 # MAGIC
 # MAGIC Models: TowerUplift (session + deployed device head), TARNet, DragonNet, CEVAE.
 # MAGIC All train on the binary within-stratum label with BCE (matches production).
+# MAGIC
+# MAGIC > The unit test suite (`pytest`) is meant to run locally / in CI, not here;
+# MAGIC > this notebook focuses on the large-scale model benchmark.
 
 # COMMAND ----------
 
-# MAGIC %md ## 1. Install the repo (editable) + deps
+# MAGIC %md ## 1. Install the repo (editable)
 
 # COMMAND ----------
 
@@ -19,9 +22,8 @@
 # Set this to wherever you synced https://github.com/billlody/two-tower-uplift-oss.
 REPO_PATH = "/Workspace/Users/yanzheng@tubitv.com/two-tower-uplift-oss"
 
-# torch/pandas/etc. are already on the ML runtime; install the package itself
-# with the `dev` extra so pytest is available for the test cell below.
-%pip install -e "{REPO_PATH}[dev]" --quiet
+# torch / pandas / matplotlib are already on the ML runtime; install the package.
+%pip install -e {REPO_PATH} --quiet
 
 # COMMAND ----------
 
@@ -44,30 +46,8 @@ print("torch:", torch.__version__)
 
 # COMMAND ----------
 
-# MAGIC %md ## 2. Run the test suite (pytest)
-
-# COMMAND ----------
-
-import subprocess
-import sys
-
-result = subprocess.run(
-    [sys.executable, "-m", "pytest", "-q"],
-    cwd=REPO_PATH,
-    capture_output=True,
-    text=True,
-)
-print(result.stdout[-4000:])
-print(result.stderr[-2000:])
-assert result.returncode == 0, (
-    f"pytest failed (returncode={result.returncode}) — see stdout/stderr above"
-)
-print("\n[OK] All tests passed.")
-
-# COMMAND ----------
-
 # MAGIC %md
-# MAGIC ## 3. Generate a LARGE synthetic world (10× the demo default)
+# MAGIC ## 2. Generate a LARGE synthetic world (10× the demo default)
 # MAGIC
 # MAGIC Demo default is 4,000 devices (~48k sessions). Here we use **40,000 devices**
 # MAGIC (~480k sessions) so a single run's NQini is stable and the bootstrap CIs are tight.
@@ -136,7 +116,7 @@ print(f"train sessions: {len(train_df):,} | test sessions (Qini computed here): 
 
 # COMMAND ----------
 
-# MAGIC %md ## 4. Train all five models (same split, same budget)
+# MAGIC %md ## 3. Train all five models (same split, same budget)
 
 # COMMAND ----------
 
@@ -177,7 +157,7 @@ print("CEVAE trained.")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 5. NQini with bootstrap 95% CI
+# MAGIC ## 4. NQini with bootstrap 95% CI
 # MAGIC
 # MAGIC Resample the test set with replacement `B` times; report the 2.5/97.5
 # MAGIC percentiles of NQini per model. Also report correlation with the known
@@ -225,7 +205,7 @@ displayHTML(disp.to_html(index=False))
 
 # COMMAND ----------
 
-# MAGIC %md ## 6. Plot: NQini with bootstrap CI error bars
+# MAGIC %md ## 5. Plot: NQini with bootstrap CI error bars
 
 # COMMAND ----------
 
@@ -255,7 +235,7 @@ display(fig)
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 7. Notes
+# MAGIC ## 6. Notes
 # MAGIC
 # MAGIC - All models train on the **binary within-stratum label** (`1[y >= stratum mean]`)
 # MAGIC   with **BCE** outcome loss and the **logit-contrast** uplift, matching the
