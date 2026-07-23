@@ -48,8 +48,26 @@ view_time_s = beta_duration · L_c                 # confounder term (large, +)
 
 Because `beta_duration · L_c` dominates and correlates with `ad_load`, the **raw**
 `corr(ad_load, view_time)` is spuriously **positive** — the "more ads = more
-engagement" paradox. Stratified z-scoring within `content_type × genre ×
-duration-decile` removes the `L_c` term and exposes the true **negative** effect.
+engagement" paradox.
+
+### The training label is binary (matches production)
+
+Following the production system (`norm3_tvt_sec_label`), the model does **not**
+regress the continuous view time. The training label is the **binary**
+within-stratum indicator
+
+```
+ỹ_s = 1[ view_time_s ≥ mean_stratum(view_time) ]      # 1 = above-average engagement
+```
+
+i.e. whether a session is high- or low-engagement *relative to comparable
+sessions in its stratum* (`content_type × genre × duration-decile`). The outcome
+head is therefore a **classifier** trained with **binary cross-entropy**, and the
+S-learner uplift is the counterfactual **logit contrast**
+`ŷ(t_high) − ŷ(t_low)` (no sigmoid — matching the paper's Eq. and the production
+model). Binarizing within stratum removes the `L_c` scale term and exposes the true
+**negative** effect: `corr(ad_load, ỹ)` flips from spuriously positive (global
+label) to negative (within-stratum label).
 
 ## Ground-truth artifacts (for verification, not assertion)
 
@@ -63,11 +81,14 @@ Returned on the sessions frame (prefixed `gt_`) and in `device_truth`:
 
 ## Signs each demo asserts
 
-| Quantity | Raw / naive | Correct (within-stratum / model) |
-|----------|-------------|----------------------------------|
-| `corr(treatment, outcome)` | **positive** (confounded) | **negative** (effect persists, not zero) |
-| `|SMD|` of duration | `> 0.1` (imbalanced) | `< 0.1` (balanced) |
-| ATE (high − low) | **positive** | **negative** |
+All correlation/ATE diagnostics use the **binary label**: the raw/confounded view is
+the *global*-mean label, the deconfounded view is the *within-stratum* label.
+
+| Quantity | Raw / global label | Within-stratum label |
+|----------|--------------------|----------------------|
+| `corr(ad_load, binary label)` | **positive** (confounded, ~`+0.23`) | **negative** (~`−0.27`; effect persists, not zero) |
+| `|SMD|` of duration | `> 0.1` (imbalanced, ~`1.9`) | `< 0.1` (balanced, ~`0.06`) |
+| ATE `= P(label=1 | high) − P(· | low)` | **positive** (~`+0.20`) | **negative** (~`−0.22`) |
 | device-level slope (Demo 2) | **positive** (wrong) | **negative** (within-stratum) |
 | device head vs `τ_d` (Demo 3) | — | `corr > 0.3` |
 

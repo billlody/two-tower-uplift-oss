@@ -353,3 +353,40 @@ def stratified_zscore(
     res = df.copy()
     res[out] = ((df[value_col] - mean) / std).fillna(0.0)
     return res
+
+
+def stratified_binary_label(
+    df: pd.DataFrame,
+    value_col: str,
+    stratum_col: str = "stratum",
+    out_col: str | None = None,
+) -> pd.DataFrame:
+    """Add the binary training label ``1[y > within-stratum mean]`` (paper Eq. 1).
+
+    This is the *actual* production training label: each session is labeled
+    high-engagement (1) or low-engagement (0) relative to comparable sessions in
+    its stratum, rather than kept as a continuous z-score.  The outcome head is
+    therefore a classifier trained with binary cross-entropy.
+
+    Parameters
+    ----------
+    df : DataFrame
+    value_col : str
+        Raw engagement column to threshold (e.g. ``view_time``).
+    stratum_col : str
+        Stratum id column.  Pass a constant column for a *global*-mean split
+        (the raw / confounded baseline used by the balance diagnostics).
+    out_col : str, optional
+        Output column name; defaults to ``f"label_{value_col}"``.
+
+    Returns
+    -------
+    DataFrame
+        Copy of ``df`` with the binary label column added (float 0.0/1.0).
+    """
+    out = out_col or f"label_{value_col}"
+    mean = df.groupby(stratum_col)[value_col].transform("mean")
+    res = df.copy()
+    # Match production: label = 1 if within-stratum z-score >= 0, i.e. y >= mean.
+    res[out] = (df[value_col] >= mean).astype(np.float32)
+    return res

@@ -30,7 +30,7 @@ from tt_uplift import (
 )
 
 from _common import (
-    NORM_OUTCOME_COL,
+    LABEL_COL,
     banner,
     build_two_tower,
     device_train_test_split,
@@ -55,12 +55,12 @@ def main() -> None:
     data = make_data()
     train_df, test_df = device_train_test_split(data.sessions, test_frac=0.3, seed=0)
 
-    enc, train_t = prep(train_df, label_col=NORM_OUTCOME_COL)
-    _, test_t = prep(test_df, label_col=NORM_OUTCOME_COL)
+    enc, train_t = prep(train_df, label_col=LABEL_COL)
+    _, test_t = prep(test_df, label_col=LABEL_COL)
     # Use the train-fitted encoders for the test tensors (avoid leakage).
     from tt_uplift import transform as _transform
 
-    test_t = _transform(test_df, enc, label_col=NORM_OUTCOME_COL)
+    test_t = _transform(test_df, enc, label_col=LABEL_COL)
 
     model = build_two_tower(enc, seed=0)
     train_two_tower(model, train_t, TrainConfig(epochs=10, alpha_distill=1.0, seed=0))

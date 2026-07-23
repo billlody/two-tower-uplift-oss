@@ -2,14 +2,18 @@
 
 import numpy as np
 
-from tt_uplift import generate, stratified_zscore
+from tt_uplift import generate, stratified_binary_label
 from tt_uplift.diagnostics import balance_report
 
 
 def _report(seed: int = 42):
     data = generate()
-    df = stratified_zscore(data.sessions, "view_time", out_col="norm_view_time")
-    return balance_report(df, "ad_load", "view_time", "norm_view_time", "duration")
+    df = data.sessions.copy()
+    # Binary engagement label: global-mean (raw/confounded) vs within-stratum.
+    df["_all"] = 0
+    df = stratified_binary_label(df, "view_time", stratum_col="_all", out_col="label_global")
+    df = stratified_binary_label(df, "view_time", out_col="label_within")
+    return balance_report(df, "ad_load", "label_global", "label_within", "duration")
 
 
 def test_raw_correlation_is_spuriously_positive():

@@ -17,7 +17,7 @@ import pandas as pd
 
 from tt_uplift.dgp import RAW_OUTCOME_COL, TREATMENT_COL
 
-from _common import NORM_OUTCOME_COL, banner, make_data
+from _common import LABEL_COL, banner, make_data
 
 
 def _slope(x: np.ndarray, y: np.ndarray) -> float:
@@ -39,10 +39,11 @@ def main() -> None:
     # (b) Device-level on raw sessions (pooled, no stratification).
     slope_session_raw = _slope(df[TREATMENT_COL].to_numpy(), df[RAW_OUTCOME_COL].to_numpy())
 
-    # (c) Session-level within-stratum (the paper's approach): normalized outcome.
+    # (c) Session-level within-stratum (the paper's approach): within-stratum
+    # treatment z-score regressed on the binary within-stratum engagement label.
     g = df.groupby("stratum")[TREATMENT_COL]
     t_within = ((df[TREATMENT_COL] - g.transform("mean")) / g.transform("std").replace(0, np.nan)).fillna(0.0)
-    slope_within = _slope(t_within.to_numpy(), df[NORM_OUTCOME_COL].to_numpy())
+    slope_within = _slope(t_within.to_numpy(), df[LABEL_COL].to_numpy())
 
     true_sign = data.meta["true_effect_sign"]
     table = pd.DataFrame(

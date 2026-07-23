@@ -20,6 +20,7 @@ from tt_uplift import (
     TwoTowerUpliftModel,
     fit_encoders,
     generate,
+    stratified_binary_label,
     stratified_zscore,
     transform,
 )
@@ -29,13 +30,30 @@ from tt_uplift.features import content_cardinalities, device_cardinalities
 OUTPUT_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "outputs")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
+# The training label is BINARY: 1[view_time >= within-stratum mean] (paper Eq. 1).
+LABEL_COL = "label_view_time"
+# Global-mean binary label: the raw / confounded baseline for balance diagnostics.
+LABEL_GLOBAL_COL = "label_view_time_global"
+# Continuous within-stratum z-score, kept only for the FWL diagnostic plot.
 NORM_OUTCOME_COL = "norm_view_time"
 
 
 def make_data(config: DGPConfig | None = None) -> SyntheticData:
-    """Generate the unified world and attach the stratified-normalized outcome."""
+    """Generate the unified world and attach binary labels (+ a continuous z-score).
+
+    Adds three engagement views: the stratified binary training label
+    (``LABEL_COL``), a global-mean binary label (``LABEL_GLOBAL_COL``, the
+    confounded baseline for diagnostics), and the continuous within-stratum
+    z-score (``NORM_OUTCOME_COL``, used only by the FWL diagnostic plot).
+    """
     data = generate(config)
-    data.sessions = stratified_zscore(data.sessions, RAW_OUTCOME_COL, out_col=NORM_OUTCOME_COL)
+    df = data.sessions
+    df = stratified_binary_label(df, RAW_OUTCOME_COL, out_col=LABEL_COL)
+    df["_all"] = 0  # single global stratum
+    df = stratified_binary_label(df, RAW_OUTCOME_COL, stratum_col="_all", out_col=LABEL_GLOBAL_COL)
+    df = df.drop(columns="_all")
+    df = stratified_zscore(df, RAW_OUTCOME_COL, out_col=NORM_OUTCOME_COL)
+    data.sessions = df
     return data
 
 
@@ -65,8 +83,8 @@ def build_two_tower(enc, use_double_ml: bool = False, seed: int = 0) -> TwoTower
     return TwoTowerUpliftModel(cfg)
 
 
-def prep(df: pd.DataFrame, label_col: str = NORM_OUTCOME_COL):
-    """Fit encoders on ``df`` and return ``(encoders, tensors)``."""
+def prep(df: pd.DataFrame, label_col: str = LABEL_COL):
+    """Fit encoders on ``df`` and return ``(encoders, tensors)`` (binary label by default)."""
     enc = fit_encoders(df)
     return enc, transform(df, enc, label_col=label_col)
 

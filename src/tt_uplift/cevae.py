@@ -120,10 +120,16 @@ class CEVAE(nn.Module):
 
     @torch.no_grad()
     def predict_uplift(self, numeric: torch.Tensor, cat: torch.Tensor) -> torch.Tensor:
-        """Do-operator uplift using auxiliary nets to encode z without a true y."""
+        """Do-operator uplift (probability contrast) via auxiliary nets to encode z.
+
+        The outcome is the binary engagement label, so decoder heads emit logits
+        and uplift is ``P(y=1 | do(t=1)) - P(y=1 | do(t=0))``.
+        """
         x = self._x(numeric, cat)
         t_hat = torch.sigmoid(self.aux_t(x))
-        y_hat = t_hat * self.aux_y1(x) + (1 - t_hat) * self.aux_y0(x)
+        # Auxiliary y-heads emit logits; feed the expected probability to the encoder.
+        y_hat = t_hat * torch.sigmoid(self.aux_y1(x)) + (1 - t_hat) * torch.sigmoid(self.aux_y0(x))
         mu, _ = self.encode(x, t_hat, y_hat)  # posterior mean as point estimate
         y0, y1 = self.decode_y(mu)
+        # Logit contrast, consistent with the two-tower S-learner uplift.
         return (y1 - y0).view(-1)

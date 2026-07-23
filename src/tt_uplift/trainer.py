@@ -2,11 +2,13 @@
 
 Implements the combined objective from the paper::
 
-    L = outcome_MSE + alpha * distillation_MSE + beta * ranking_loss (+ DoubleML)
+    L = outcome_BCE + alpha * distillation_MSE + beta * ranking_loss (+ DoubleML)
 
-where distillation trains the device uplift head to reproduce the (stop-gradient)
-session-level uplift.  No distributed/AMP/checkpoint machinery — just enough to
-train the small synthetic models deterministically.
+The outcome head is a classifier for the binary within-stratum engagement label
+(``1[y >= stratum mean]``), so the outcome term is binary cross-entropy;
+distillation trains the device uplift head to reproduce the (stop-gradient)
+session-level uplift (a logit contrast) via MSE.  No distributed/AMP/checkpoint
+machinery — just enough to train the small synthetic models deterministically.
 """
 
 from __future__ import annotations
@@ -81,7 +83,8 @@ def train_two_tower(model: TwoTowerUpliftModel, data: Tensors, cfg: TrainConfig)
                 t_low=t_low,
             )
             y = data.outcome[b].to(dev)
-            loss = F.mse_loss(out["y_hat"], y)
+            # Outcome head is a classifier for the binary within-stratum label.
+            loss = F.binary_cross_entropy_with_logits(out["y_hat"], y)
 
             # Distillation: device uplift head -> stop-grad session uplift.
             target = out["session_uplift"].detach()
@@ -123,7 +126,8 @@ def train_baseline(model: TARNet | DragonNet, data: Tensors, cfg: TrainConfig, i
         for bidx in _iter_batches(n, cfg.batch_size, rng):
             b = torch.as_tensor(bidx, dtype=torch.long)
             out = model(numeric[b].to(dev), cat[b].to(dev), data.treatment_binary[b].to(dev))
-            loss = F.mse_loss(out["y_hat"], data.outcome[b].to(dev))
+            # Factual-outcome classification loss (binary engagement label).
+            loss = F.binary_cross_entropy_with_logits(out["y_hat"], data.outcome[b].to(dev))
             if is_dragonnet and "propensity_logit" in out:
                 loss = loss + 0.1 * F.binary_cross_entropy_with_logits(
                     out["propensity_logit"], data.treatment_binary[b].to(dev)
@@ -196,13 +200,14 @@ def train_cevae(model: CEVAE, data: Tensors, cfg: TrainConfig, kl_weight: float 
             out = model(numeric[b].to(dev), cat[b].to(dev), t, y, sample=True)
 
             recon_x = F.mse_loss(out["x_rec"], out["x"])
-            recon_y = F.mse_loss(out["y_rec"], y)
+            # Binary engagement outcome: factual reconstruction is a BCE on the arm logit.
+            recon_y = F.binary_cross_entropy_with_logits(out["y_rec"], y)
             recon_t = F.binary_cross_entropy_with_logits(out["t_logit"], t)
             kl = -0.5 * torch.mean(1 + out["z_logvar"] - out["z_mu"].pow(2) - out["z_logvar"].exp())
 
             # Auxiliary inference networks: match observed t and factual y.
             aux_t = F.binary_cross_entropy_with_logits(out["aux_t_logit"], t)
-            aux_y = F.mse_loss(t * out["aux_y1"] + (1 - t) * out["aux_y0"], y)
+            aux_y = F.binary_cross_entropy_with_logits(t * out["aux_y1"] + (1 - t) * out["aux_y0"], y)
 
             loss = recon_x + recon_y + recon_t + kl_weight * kl + aux_t + aux_y
 

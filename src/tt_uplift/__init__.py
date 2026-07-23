@@ -12,6 +12,7 @@ from .dgp import (
     DGPConfig,
     SyntheticData,
     generate,
+    stratified_binary_label,
     stratified_zscore,
 )
 from .evaluation import compute_aucc, normalized_qini, uplift_curve
@@ -39,6 +40,7 @@ __all__ = [
     "SyntheticData",
     "generate",
     "stratified_zscore",
+    "stratified_binary_label",
     "Encoders",
     "Tensors",
     "fit_encoders",

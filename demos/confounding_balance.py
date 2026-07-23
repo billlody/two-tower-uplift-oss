@@ -23,7 +23,7 @@ import pandas as pd
 from tt_uplift.diagnostics import balance_report
 from tt_uplift.dgp import RAW_OUTCOME_COL, TREATMENT_COL
 
-from _common import NORM_OUTCOME_COL, OUTPUT_DIR, banner, make_data
+from _common import LABEL_COL, LABEL_GLOBAL_COL, NORM_OUTCOME_COL, OUTPUT_DIR, banner, make_data
 
 
 def _binned(x: np.ndarray, y: np.ndarray, nbins: int = 20):
@@ -43,15 +43,19 @@ def main() -> None:
     data = make_data()
     df = data.sessions
 
-    rep = balance_report(df, TREATMENT_COL, RAW_OUTCOME_COL, NORM_OUTCOME_COL, "duration")
+    # Diagnostics run on the BINARY engagement label (the production training
+    # target): the raw/confounded view is the global-mean label, the deconfounded
+    # view is the within-stratum label.  This mirrors the production balance table
+    # (point-biserial correlation of ad load vs. a binary label).
+    rep = balance_report(df, TREATMENT_COL, LABEL_GLOBAL_COL, LABEL_COL, "duration")
 
     table = pd.DataFrame(
         [
-            ["corr(treatment, outcome)", f"{rep['corr_raw']:+.4f}", f"{rep['corr_within']:+.4f}", "flip + -> - (effect persists, NOT zero)"],
+            ["corr(ad_load, binary label)", f"{rep['corr_raw']:+.4f}", f"{rep['corr_within']:+.4f}", "flip + -> - (effect persists, NOT zero)"],
             ["|SMD| of duration (confounder)", f"{rep['smd_global']:.4f}", f"{rep['smd_within']:.4f}", "shrink < 0.1 (balance)"],
-            ["ATE (high - low)", f"{rep['ate_raw']:+.4f}", f"{rep['ate_norm']:+.4f}", "flip + -> - (expected sign)"],
+            ["ATE = P(label=1 | high) - P(.| low)", f"{rep['ate_raw']:+.4f}", f"{rep['ate_norm']:+.4f}", "flip + -> - (expected sign)"],
         ],
-        columns=["Diagnostic", "Raw / Overall", "Within-stratum / Normalized", "Expected"],
+        columns=["Diagnostic", "Raw / Global label", "Within-stratum label", "Expected"],
     )
     print(table.to_string(index=False))
     print(f"\nGround-truth causal effect sign in the DGP: {data.meta['true_effect_sign'].upper()}")
@@ -62,7 +66,7 @@ def main() -> None:
     assert rep["smd_global"] > 0.1, "confounder should be imbalanced overall"
     assert rep["smd_within"] < 0.1, "confounder should be balanced within strata"
     assert rep["ate_raw"] > 0 and rep["ate_norm"] < 0, "ATE sign should flip"
-    print("\n[OK] All balance/effect signs match the known ground truth.")
+    print("\n[OK] All balance/effect signs match the known ground truth (binary label).")
 
     # ---- FWL-style figure: raw vs within-stratum-normalized -----------------
     # Within-stratum treatment z-score for the residual view.

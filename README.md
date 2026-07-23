@@ -62,9 +62,10 @@ done
 interactions (`model.py`), device-uplift **distillation** head, optional
 **DoubleML** treatment residualization, **TARNet** + **DragonNet** + **CEVAE** NN
 uplift baselines (`model.py`, `cevae.py`), pairwise **ranking loss**
-(`losses.py`), **AUCC / normalized Qini** (`evaluation.py`), stratified z-score
-normalization (`dgp.stratified_zscore`), heuristic aggregation baselines
-(`aggregation.py`), and balance diagnostics (`diagnostics.py`).
+(`losses.py`), **AUCC / normalized Qini** (`evaluation.py`), the **binary
+within-stratum training label** with BCE outcome loss (`dgp.stratified_binary_label`,
+matching the production `norm3_tvt_sec_label` classifier), heuristic aggregation
+baselines (`aggregation.py`), and balance diagnostics (`diagnostics.py`).
 
 **Dropped (production-only, not needed for the arguments):** DCN-V2 cross layers,
 sequence transformers over watch/ad history, bucket & high-cardinality ID

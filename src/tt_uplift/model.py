@@ -167,6 +167,8 @@ class TwoTowerUpliftModel(nn.Module):
 
         t_proj = self.treatment_proj(t_residual)
         combined = torch.cat([d, c, interaction, d * t_proj, c * t_proj, t_residual], dim=1)
+        # Outcome head is a CLASSIFIER: y_hat is a logit for the binary
+        # within-stratum-high-engagement label (paper Eq. 1), trained with BCE.
         y_hat = self.outcome_head(combined)
 
         # S-learner counterfactual with continuous treatment.
@@ -193,6 +195,8 @@ class TwoTowerUpliftModel(nn.Module):
         y_lo = self.outcome_head(
             torch.cat([d, c, interaction, d * self.treatment_proj(t_lo_res), c * self.treatment_proj(t_lo_res), t_lo_res], dim=1)
         )
+        # S-learner counterfactual contrast on the outcome-head logits (paper
+        # Eq. session_uplift; matches production, which does not apply sigmoid).
         session_uplift = y_hi - y_lo
 
         device_uplift = self.device_uplift_head(d)
@@ -254,10 +258,13 @@ class TARNet(nn.Module):
 
     def forward(self, numeric: torch.Tensor, cat: torch.Tensor, treatment_bin: torch.Tensor) -> Dict[str, torch.Tensor]:
         phi = self._phi(numeric, cat)
+        # Per-arm heads output logits for the binary engagement label.
         y0, y1 = self.head0(phi), self.head1(phi)
         t = treatment_bin.view(-1, 1)
-        y_hat = t * y1 + (1 - t) * y0
-        return {"y_hat": y_hat, "y0": y0, "y1": y1, "uplift": y1 - y0, "repr": phi}
+        y_hat = t * y1 + (1 - t) * y0  # factual logit
+        # Uplift = per-arm logit contrast (consistent with the two-tower S-learner).
+        uplift = y1 - y0
+        return {"y_hat": y_hat, "y0": y0, "y1": y1, "uplift": uplift, "repr": phi}
 
 
 class DragonNet(TARNet):

@@ -10,7 +10,7 @@ from tt_uplift import (
     generate,
     normalized_qini,
     predict_device_uplift_two_tower,
-    stratified_zscore,
+    stratified_binary_label,
     train_two_tower,
     transform,
 )
@@ -41,9 +41,9 @@ def test_normalized_qini_range_sane():
 
 def test_two_tower_recovers_device_ground_truth():
     data = generate(DGPConfig(n_devices=1500, seed=7))
-    df = stratified_zscore(data.sessions, "view_time", out_col="norm_view_time")
+    df = stratified_binary_label(data.sessions, "view_time", out_col="label_view_time")
     enc = fit_encoders(df)
-    tens = transform(df, enc, label_col="norm_view_time")
+    tens = transform(df, enc, label_col="label_view_time")
     cfg = TwoTowerConfig(
         device_numeric_dim=len(DEVICE_NUMERIC),
         content_numeric_dim=len(CONTENT_NUMERIC),

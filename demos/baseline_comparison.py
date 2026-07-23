@@ -44,7 +44,7 @@ from tt_uplift import (
 )
 
 from _common import (
-    NORM_OUTCOME_COL,
+    LABEL_COL,
     OUTPUT_DIR,
     banner,
     build_cevae,
@@ -70,8 +70,8 @@ def main() -> None:
     banner("DEMO 5: Offline comparison vs deep-learning uplift baselines (TARNet, DragonNet, CEVAE)")
     data = make_data()
     train_df, test_df = device_train_test_split(data.sessions, test_frac=0.3, seed=0)
-    enc, train_t = prep(train_df, label_col=NORM_OUTCOME_COL)
-    test_t = transform(test_df, enc, label_col=NORM_OUTCOME_COL)
+    enc, train_t = prep(train_df, label_col=LABEL_COL)
+    test_t = transform(test_df, enc, label_col=LABEL_COL)
 
     y = test_t.outcome.numpy().ravel()
     t = test_t.treatment_binary.numpy().ravel()
