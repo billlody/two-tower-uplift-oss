@@ -19,8 +19,9 @@
 # Set this to wherever you synced https://github.com/billlody/two-tower-uplift-oss.
 REPO_PATH = "/Workspace/Users/yanzheng@tubitv.com/two-tower-uplift-oss"
 
-# torch/pandas/etc. are already on the ML runtime; install the package itself.
-%pip install -e {REPO_PATH} --quiet
+# torch/pandas/etc. are already on the ML runtime; install the package itself
+# with the `dev` extra so pytest is available for the test cell below.
+%pip install -e "{REPO_PATH}[dev]" --quiet
 
 # COMMAND ----------
 
@@ -48,16 +49,19 @@ print("torch:", torch.__version__)
 # COMMAND ----------
 
 import subprocess
+import sys
 
 result = subprocess.run(
-    ["python", "-m", "pytest", "-q"],
+    [sys.executable, "-m", "pytest", "-q"],
     cwd=REPO_PATH,
     capture_output=True,
     text=True,
 )
 print(result.stdout[-4000:])
 print(result.stderr[-2000:])
-assert result.returncode == 0, "pytest failed — see output above"
+assert result.returncode == 0, (
+    f"pytest failed (returncode={result.returncode}) — see stdout/stderr above"
+)
 print("\n[OK] All tests passed.")
 
 # COMMAND ----------
